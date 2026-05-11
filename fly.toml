@@ -1,0 +1,40 @@
+# fly.toml — RAG API homework deployment
+# Edit `app` to your unique Fly app name after `fly launch --no-deploy --copy-config`.
+
+app = "rag-api-homework"
+primary_region = "fra"  # Frankfurt — close to Supabase eu-central-1
+kill_signal = "SIGINT"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  # The HuggingFace cache is baked into the image during build
+  HF_HOME = "/opt/hf-cache"
+  SENTENCE_TRANSFORMERS_HOME = "/opt/hf-cache"
+  HF_HUB_OFFLINE = "1"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # CRITICAL: must be false. SSE streaming breaks if Fly puts the machine to
+  # sleep mid-response. ТЗ §11 explicitly calls this out.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"  # sentence-transformers + torch needs ~600MB at rest
+  cpu_kind = "shared"
+  cpus = 1
